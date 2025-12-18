@@ -1,7 +1,7 @@
 
 import { Campus, DailyReport } from '../types';
 
-const SCRIPT_URL: string = 'https://script.google.com/macros/s/AKfycbyeige3RYLKIGKvVRo3s-02jnuHDAzQb4H7GAbQ2vWNrEtZD_P9J8f3Xtlk-AzfGWQ/exec'; 
+const SCRIPT_URL: string = 'https://script.google.com/macros/s/AKfycbxz191X8JOWmGHgdkUHXucJHcm1un_QR3msFnZuq678ka5UBRYMMmZfSrIsY--ToeIc/exec'; 
 
 export const fetchUsersFromSheets = async () => {
   if (!SCRIPT_URL) return [];
@@ -31,6 +31,7 @@ export const fetchReportsFromSheets = async (): Promise<DailyReport[]> => {
     
     if (!Array.isArray(data)) return [];
 
+    // Mapeo alineado 1:1 con las columnas de Google Sheets (Script v3.6)
     return data.map((r: any, index: number) => ({
       id: String(r.id || `cloud-${index}`),
       date: r.date ? r.date.split('T')[0] : '',
@@ -40,13 +41,13 @@ export const fetchReportsFromSheets = async (): Promise<DailyReport[]> => {
       campus: r.campus as Campus,
       mood: Number(r.mood) || 5,
       foodIntake: Number(r.foodIntake) || 100,
-      activities: r.activities || '',
-      notes: r.notes || '',
+      hygiene: (r.hygiene as any) || 'Good',
+      clothingChange: r.clothingChange === 'SÍ' || r.clothingChange === true,
+      sleep: r.sleep === 'SÍ' || r.sleep === true,
       medication: r.medication || '',
       medicationTime: r.medicationTime || '',
-      sleep: r.sleep === 'SÍ' || r.sleep === true,
-      hygiene: (r.hygiene as any) || 'Good',
-      clothingChange: r.clothingChange === 'SÍ' || r.clothingChange === true
+      activities: r.activities || '',
+      notes: r.notes || ''
     }));
   } catch (e) { 
     console.error("Error fetching reports:", e);
@@ -57,6 +58,7 @@ export const fetchReportsFromSheets = async (): Promise<DailyReport[]> => {
 export const syncReportToSheets = async (report: DailyReport, studentEmail: string, studentName: string) => {
   if (!SCRIPT_URL) return { success: false };
   try {
+    console.log("Iniciando sincronización oficial...");
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -68,8 +70,10 @@ export const syncReportToSheets = async (report: DailyReport, studentEmail: stri
         emailConfig: { to: studentEmail, subject: `📝 Reporte Cambridge - ${studentName}`, studentName }
       }),
     });
+    console.log("Sincronización enviada a la cola de Google Sheets.");
     return { success: true };
   } catch (e) { 
+    console.error("Error en sincronización:", e);
     return { success: false }; 
   }
 };
