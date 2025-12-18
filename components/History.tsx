@@ -1,13 +1,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { DailyReport, Student, Teacher } from '../types';
-import { getReportsByStudent, getReports } from '../services/reportService';
-import { fetchStudentsFromSheets, fetchTeachersFromSheets } from '../services/googleSheetService';
+import { DailyReport, Student } from '../types';
+import { fetchStudentsFromSheets, fetchReportsFromSheets } from '../services/googleSheetService';
 import { generateWeeklyInsight } from '../services/geminiService';
 import { NeonButton } from './NeonButton';
 import { EmailModal } from './EmailModal';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Bot, Calendar, Printer, ArrowLeft, Mail, Save, RefreshCw, Star } from 'lucide-react';
+import { 
+  ArrowLeft, Mail, Star, FileText, Download, 
+  AlertTriangle, Utensils, Moon, ShieldCheck, Heart
+} from 'lucide-react';
 
 interface HistoryProps {
   onBack: () => void;
@@ -19,49 +20,40 @@ export const History: React.FC<HistoryProps> = ({ onBack, mode = 'view' }) => {
   const [insight, setInsight] = useState<string>('');
   const [loadingInsight, setLoadingInsight] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  
   const [students, setStudents] = useState<Student[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-
+  const [allReports, setAllReports] = useState<DailyReport[]>([]);
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailData, setEmailData] = useState({
-    email: '',
-    subject: '',
-    htmlContent: '',
-    textContent: ''
-  });
 
   useEffect(() => {
     const loadAllData = async () => {
       setLoadingData(true);
-      const [s, t] = await Promise.all([
-        fetchStudentsFromSheets(),
-        fetchTeachersFromSheets()
-      ]);
-      setStudents(s);
-      setTeachers(t);
-      setLoadingData(false);
+      try {
+        const [s, r] = await Promise.all([
+          fetchStudentsFromSheets(),
+          fetchReportsFromSheets()
+        ]);
+        setStudents(s);
+        setAllReports(r);
+      } catch (e) {
+        console.error("Error de sincronización con la base de datos");
+      } finally {
+        setLoadingData(false);
+      }
     };
     loadAllData();
   }, []);
 
   const reports = useMemo(() => {
     if (!selectedStudentId) return [];
-    return getReportsByStudent(selectedStudentId);
-  }, [selectedStudentId]);
-
-  const chartData = useMemo(() => {
-    return reports.slice(0, 7).reverse().map(r => ({
-      date: r.date.substring(5), 
-      mood: r.mood,
-      food: r.foodIntake
-    }));
-  }, [reports]);
+    return allReports
+      .filter(r => String(r.studentId) === String(selectedStudentId))
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 10);
+  }, [selectedStudentId, allReports]);
 
   const handleGenerateInsight = async () => {
     const student = students.find(s => String(s.id) === String(selectedStudentId));
     if (!student || reports.length === 0) return;
-
     setLoadingInsight(true);
     setInsight('');
     const text = await generateWeeklyInsight(student, reports.slice(0, 5));
@@ -69,224 +61,221 @@ export const History: React.FC<HistoryProps> = ({ onBack, mode = 'view' }) => {
     setLoadingInsight(false);
   };
 
+  const currentStudent = students.find(s => String(s.id) === String(selectedStudentId));
+
   const handlePrint = () => {
+    if (!selectedStudentId) return;
+    
+    const originalTitle = document.title;
+    document.title = `Cambridge_Reporte_${currentStudent?.name.replace(/\s+/g, '_')}`;
+    
+    // El comando de impresión se ejecuta directamente para evitar bloqueos de Edge
     window.print();
+    
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
   };
 
-  const handleGlobalBackup = () => {
-    const allReports = getReports(); 
-    if (allReports.length === 0) return;
-    const fileName = `Respaldo_Cambridge_${new Date().toISOString().split('T')[0]}.json`;
-    const blob = new Blob([JSON.stringify(allReports, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    link.click();
-  };
-
-  const handlePrepareEmail = async () => {
-    const student = students.find(s => String(s.id) === String(selectedStudentId));
-    if (!student) return;
-
-    let htmlFormatted = insight ? insight.replace(/\n/g, '<br>') : "Resumen de progreso semanal.";
-
-    setEmailData({
-      email: student.parentEmail,
-      subject: `📅 Reporte Semanal - ${student.name}`,
-      htmlContent: `<div style="font-family: sans-serif; color: #333; line-height: 1.6;">
-        <h2 style="color: #003366;">Reporte Semanal de ${student.name}</h2>
-        <div style="background: #fdfdfd; padding: 25px; border-radius: 12px; border: 1px solid #eee; border-left: 6px solid #bc13fe;">
-          <div style="white-space: pre-wrap;">${htmlFormatted}</div>
-        </div>
-      </div>`,
-      textContent: insight || "Reporte Semanal."
-    });
-    setShowEmailModal(true);
+  const getFoodLabel = (val: number) => {
+    if (val <= 0) return "Nada";
+    if (val <= 25) return "Poco";
+    if (val <= 50) return "Medio";
+    if (val <= 75) return "Casi Todo";
+    return "Todo";
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 md:p-8 animate-fadeIn pb-24">
+    <div className="w-full max-w-6xl mx-auto p-4 md:p-8 pb-24">
        
        <EmailModal 
         isOpen={showEmailModal}
         onClose={() => setShowEmailModal(false)}
-        defaultEmail={emailData.email}
-        subject={emailData.subject}
-        htmlContent={emailData.htmlContent}
-        textContent={emailData.textContent}
+        defaultEmail={currentStudent?.parentEmail || ''}
+        subject={`📅 Reporte de Desempeño - ${currentStudent?.name}`}
+        htmlContent={`<div style="font-family:sans-serif;"><h2>Reporte de ${currentStudent?.name}</h2><p>${insight}</p></div>`}
+        textContent={insight || "Reporte Semanal Cambridge."}
       />
 
-       <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4 no-print">
-        <h2 className="text-2xl md:text-3xl font-bold text-white uppercase tracking-wider">
-          {mode === 'print' ? 'Generar PDF' : 'Historial'} <span className="text-fuchsia-400">General</span>
+       <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4 print:hidden">
+        <h2 className="text-2xl font-bold text-white uppercase tracking-wider">
+          {mode === 'print' ? 'Generar' : 'Historial'} <span className="text-cyan-400 text-sm ml-2">PDF OFICIAL</span>
         </h2>
-        <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-fuchsia-400 transition-all group">
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="font-semibold">Volver</span>
+        <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-cyan-400 transition-all uppercase text-[10px] font-black tracking-widest">
+          <ArrowLeft className="w-4 h-4" /> Volver al Tablero
         </button>
       </div>
 
-      <div className="bg-neon-card p-6 rounded-xl border border-gray-800 mb-8 no-print">
-        <label className="block text-xs uppercase tracking-wide text-gray-400 mb-2 font-bold">Seleccionar Alumno</label>
-        <div className="flex gap-4">
-          <select 
-            value={selectedStudentId}
-            onChange={(e) => { setSelectedStudentId(e.target.value); setInsight(''); }}
-            className="flex-1 bg-gray-900 text-white border border-gray-700 rounded p-3 focus:border-fuchsia-400 outline-none transition-colors font-bold"
-            disabled={loadingData}
-          >
-            <option value="">{loadingData ? 'Cargando datos...' : '-- Seleccionar --'}</option>
-            {students.map(s => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({teachers.find(t => String(t.id) === String(s.teacherId))?.name || 'Maestra'})
-              </option>
-            ))}
-          </select>
-          {loadingData && <RefreshCw className="w-6 h-6 text-fuchsia-400 animate-spin self-center" />}
-        </div>
+      <div className="bg-neon-card p-6 rounded-xl border border-gray-800 mb-8 print:hidden shadow-2xl">
+        <label className="block text-[10px] uppercase text-cyan-400 mb-3 font-black tracking-[0.2em]">Buscador de Alumno</label>
+        <select 
+          value={selectedStudentId}
+          onChange={(e) => { setSelectedStudentId(e.target.value); setInsight(''); }}
+          className="w-full bg-[#0a0a12] text-white border border-gray-700 rounded-lg p-4 font-bold text-lg outline-none cursor-pointer focus:border-cyan-400 transition-all"
+        >
+          <option value="">{loadingData ? 'SINCRONIZANDO...' : 'SELECCIONA UN ESTUDIANTE'}</option>
+          {students.map(s => <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>)}
+        </select>
       </div>
 
       {selectedStudentId && reports.length > 0 && (
-        <div className="space-y-8 print-container">
-          
-          <div className="hidden print-block text-black mb-8 border-b-2 border-black pb-4">
-            <h1 className="text-4xl font-black uppercase tracking-tighter">Cambridge College</h1>
-            <p className="text-sm uppercase font-bold text-gray-600">Reporte Semanal de Evaluación</p>
-            <div className="mt-4 grid grid-cols-2 text-sm">
-               <p><b>Alumno:</b> {students.find(s => String(s.id) === String(selectedStudentId))?.name}</p>
-               <p className="text-right"><b>Fecha:</b> {new Date().toLocaleDateString()}</p>
-            </div>
-          </div>
-
-          {mode === 'print' && (
-            <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl flex justify-between items-center no-print mb-6">
+        <div className="space-y-8 animate-fadeIn">
+          <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center print:hidden gap-4 shadow-xl">
+            <div className="flex items-center gap-4">
+              <div className="bg-green-500/20 p-3 rounded-full">
+                <ShieldCheck className="w-6 h-6 text-green-400" />
+              </div>
               <div>
-                <h3 className="text-green-400 font-bold uppercase text-sm">Panel de Exportación</h3>
-                <p className="text-[10px] text-gray-400 uppercase tracking-widest">Genera el PDF o envía por email</p>
-              </div>
-              <div className="flex gap-3">
-                 <button onClick={handlePrint} className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded text-xs font-bold hover:bg-gray-700 transition-colors">
-                    <Printer className="w-4 h-4" /> IMPRIMIR PDF
-                 </button>
-                 <NeonButton onClick={handlePrepareEmail} variant="green" className="py-2 px-4 text-xs flex items-center gap-2">
-                    <Mail className="w-4 h-4" /> ENVIAR A PADRES
-                 </NeonButton>
+                <span className="text-white font-bold uppercase text-sm block">Documento Verificado</span>
+                <span className="text-[10px] text-gray-500 uppercase font-black">Listo para descarga o envío</span>
               </div>
             </div>
-          )}
-
-          {/* CUADRO DE IA - FORMATEADO PARA PDF */}
-          <div className="bg-gradient-to-br from-purple-900/40 via-gray-900/50 to-blue-900/40 p-6 rounded-2xl border border-purple-500/30 shadow-2xl relative overflow-hidden print:bg-white print:border-black print:border-2 print:shadow-none">
-            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none no-print">
-                <Bot className="w-32 h-32 text-purple-400" />
+            <div className="flex gap-3 w-full md:w-auto">
+               <button 
+                 onClick={handlePrint} 
+                 className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white text-black px-10 py-4 rounded-xl text-xs font-black hover:bg-cyan-400 transition-all shadow-lg active:scale-95"
+               >
+                  <Download className="w-5 h-5" /> DESCARGAR PDF
+               </button>
+               <NeonButton onClick={() => setShowEmailModal(true)} variant="green" className="flex-1 md:flex-none py-4 px-6 text-xs">
+                  <Mail className="w-5 h-5 mr-2 inline" /> ENVIAR POR EMAIL
+               </NeonButton>
             </div>
-            
-            <div className="flex justify-between items-center mb-6 relative z-10">
-              <h3 className="text-purple-400 font-black uppercase text-xs tracking-[0.2em] flex items-center gap-2 print:text-black print:font-bold">
-                <Star className="w-4 h-4 fill-purple-400 print:fill-black" /> RESUMEN DE PROGRESO (IA)
-              </h3>
-              {!insight && !loadingInsight && (
-                <NeonButton onClick={handleGenerateInsight} variant="purple" className="text-[10px] px-4 py-2 no-print">
-                  GENERAR ANÁLISIS
-                </NeonButton>
-              )}
+          </div>
+
+          <div id="pdf-content" className="bg-neon-card p-8 rounded-2xl border border-gray-800 print:bg-white print:p-0 print:border-none print:m-0 print:text-black">
+            {/* Cabecera Oficial Cambridge */}
+            <div className="hidden print:flex items-center justify-between mb-8 border-b-4 border-blue-900 pb-6">
+              <div>
+                <h1 className="text-4xl font-black text-blue-900 uppercase m-0 tracking-tighter">Cambridge College</h1>
+                <p className="text-[12px] font-bold text-gray-500 uppercase tracking-[0.3em] mt-1">Daily & Weekly Performance Report</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-blue-900 uppercase">Ciclo Escolar</p>
+                <p className="text-lg font-bold">2024 - 2025</p>
+              </div>
             </div>
 
-            {loadingInsight ? (
-               <div className="flex items-center gap-3 text-purple-300 py-4 animate-pulse no-print">
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  <span className="text-xs font-bold uppercase tracking-widest">Analizando comportamiento semanal...</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 print:bg-gray-50 print:p-6 print:rounded-2xl print:border print:border-gray-200">
+               <div className="space-y-1">
+                  <p className="text-[10px] text-cyan-400 font-black uppercase print:text-blue-900">Nombre del Alumno</p>
+                  <p className="text-2xl font-bold text-white print:text-black">{currentStudent?.name}</p>
+                  <p className="text-xs text-gray-400 print:text-gray-600 font-medium">ID: {currentStudent?.id}</p>
                </div>
-            ) : insight ? (
-              <div className="relative z-10">
-                <p className="text-gray-200 text-base leading-relaxed whitespace-pre-wrap font-sans print:text-black print:leading-normal">
-                  {insight}
-                </p>
+               <div className="md:text-right space-y-1">
+                  <p className="text-[10px] text-cyan-400 font-black uppercase print:text-blue-900">Grado y Sección</p>
+                  <p className="text-xl font-bold text-white print:text-black">{currentStudent?.ageGroup}</p>
+                  <p className="text-xs text-gray-400 print:text-gray-600 font-medium">Campus: {reports[0]?.campus}</p>
+               </div>
+            </div>
+
+            {/* Resumen de IA */}
+            <div className="mb-10 bg-[#1a1a2e] p-6 rounded-2xl border border-fuchsia-500/20 print:bg-white print:border-2 print:border-blue-900/10 print:p-8">
+               <h3 className="text-fuchsia-400 font-black text-xs uppercase mb-4 flex items-center gap-2 print:text-blue-900 print:border-b-2 print:border-blue-900 print:pb-2 print:mb-6">
+                  <Star className="w-4 h-4 fill-fuchsia-400 print:fill-blue-900" /> Reporte de Logros Semanales
+               </h3>
+               {insight ? (
+                 <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap print:text-black print:text-[14px]">
+                   {insight}
+                 </div>
+               ) : (
+                 <div className="print:hidden text-center py-6">
+                   <p className="text-gray-500 text-xs mb-4 font-medium">Haz clic para generar el análisis automático con Inteligencia Artificial.</p>
+                   <button onClick={handleGenerateInsight} className="bg-fuchsia-600 text-white text-[10px] font-black px-8 py-3 rounded-full hover:shadow-neon-pink transition-all uppercase tracking-widest">
+                      {loadingInsight ? 'Analizando...' : 'Generar Análisis IA'}
+                   </button>
+                 </div>
+               )}
+            </div>
+
+            {/* Tabla de Reportes Diarios */}
+            <div>
+              <h3 className="text-cyan-400 font-black text-xs uppercase mb-4 flex items-center gap-2 print:text-blue-900">
+                <FileText className="w-4 h-4" /> Desglose de Actividades Diarias
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[11px] border-collapse">
+                   <thead>
+                      <tr className="bg-gray-800 print:bg-blue-900 print:text-white">
+                         <th className="p-4 border border-gray-700 print:border-blue-900">FECHA</th>
+                         <th className="p-4 border border-gray-700 print:border-blue-900 text-center">ÁNIMO</th>
+                         <th className="p-4 border border-gray-700 print:border-blue-900 text-center">COMIDA</th>
+                         <th className="p-4 border border-gray-700 print:border-blue-900 text-center">SIESTA</th>
+                         <th className="p-4 border border-gray-700 print:border-blue-900">OBSERVACIONES</th>
+                      </tr>
+                   </thead>
+                   <tbody>
+                      {reports.map((r, i) => (
+                        <tr key={i} className="border-b border-gray-800 print:border-gray-200">
+                           <td className="p-4 font-bold text-white print:text-black whitespace-nowrap">{r.date}</td>
+                           <td className="p-4 text-center">
+                              <span className="bg-gray-700 px-2 py-1 rounded print:bg-transparent print:p-0 font-bold">{r.mood}/5</span>
+                           </td>
+                           <td className="p-4 text-center font-medium print:text-black">{getFoodLabel(r.foodIntake)}</td>
+                           <td className="p-4 text-center font-bold print:text-black">{r.sleep ? 'SÍ' : 'NO'}</td>
+                           <td className="p-4 text-gray-400 print:text-black italic leading-tight">{r.activities}</td>
+                        </tr>
+                      ))}
+                   </tbody>
+                </table>
               </div>
-            ) : (
-              <p className="text-gray-500 text-xs uppercase tracking-widest text-center py-4 no-print">Haz clic en Generar para ver el análisis de la semana.</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 no-print">
-            <div className="bg-gray-900/50 p-6 rounded-xl border border-gray-800 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis dataKey="date" stroke="#666" fontSize={10} />
-                  <YAxis domain={[0, 5]} stroke="#666" fontSize={10} />
-                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333', fontSize: '12px' }} />
-                  <Line type="monotone" dataKey="mood" stroke="#22d3ee" strokeWidth={3} dot={{ r: 4, fill: '#22d3ee' }} />
-                </LineChart>
-              </ResponsiveContainer>
             </div>
-             <div className="bg-gray-900/50 p-6 rounded-xl border border-gray-800 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis dataKey="date" stroke="#666" fontSize={10} />
-                  <YAxis domain={[0, 100]} stroke="#666" fontSize={10} />
-                  <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333', fontSize: '12px' }} />
-                  <Bar dataKey="food" fill="#4ade80" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
 
-          <div className="bg-neon-card rounded-xl border border-gray-800 overflow-hidden print:border-black print:border-2">
-             <table className="w-full text-left text-sm">
-               <thead className="bg-gray-900 text-[10px] uppercase text-gray-500 print:bg-gray-100 print:text-black">
-                 <tr>
-                   <th className="p-4">Fecha</th>
-                   <th className="p-4">Ánimo</th>
-                   <th className="p-4">Alim.</th>
-                   <th className="p-4">Higiene</th>
-                   <th className="p-4">Actividades</th>
-                 </tr>
-               </thead>
-               <tbody className="divide-y divide-gray-800 text-gray-400 print:divide-gray-300 print:text-black">
-                 {reports.map((r) => (
-                   <tr key={r.id} className="hover:bg-gray-800/30">
-                     <td className="p-4 text-white font-mono print:text-black">{r.date}</td>
-                     <td className="p-4">{r.mood}/5</td>
-                     <td className="p-4">{r.foodIntake}%</td>
-                     <td className="p-4">{r.hygiene === 'Excellent' ? 'Exc.' : r.hygiene === 'Good' ? 'Bien' : 'Atenc.'}</td>
-                     <td className="p-4 max-w-xs truncate print:whitespace-normal">{r.activities}</td>
-                   </tr>
-                 ))}
-               </tbody>
-             </table>
+            <div className="hidden print:grid grid-cols-2 gap-20 mt-20 pt-10 border-t border-gray-200">
+                <div className="text-center">
+                  <div className="border-t border-black w-48 mx-auto mt-10"></div>
+                  <p className="text-[10px] font-black uppercase mt-2">Firma del Maestro(a)</p>
+                </div>
+                <div className="text-center">
+                  <div className="border-t border-black w-48 mx-auto mt-10"></div>
+                  <p className="text-[10px] font-black uppercase mt-2">Sello Institucional</p>
+                </div>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="mt-12 no-print flex justify-center opacity-30 hover:opacity-100 transition-opacity">
-          <button onClick={handleGlobalBackup} className="text-[10px] uppercase font-black text-cyan-400 flex items-center gap-2 border border-cyan-400/30 px-4 py-2 rounded-full">
-            <Save className="w-3 h-3"/> RESPALDAR BASE DE DATOS LOCAL
-          </button>
-      </div>
+      {selectedStudentId && reports.length === 0 && (
+         <div className="text-center py-24 bg-neon-card rounded-2xl border border-gray-800 border-dashed animate-pulse">
+            <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-6 opacity-50" />
+            <p className="text-gray-500 font-bold uppercase tracking-[0.3em] text-sm">No hay reportes cargados en la base de datos.</p>
+         </div>
+      )}
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          @page { margin: 1.5cm; size: portrait; }
-          body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; }
-          .no-print { display: none !important; }
-          .print-block { display: block !important; }
-          .bg-neon-card { background: white !important; border: 1px solid #000 !important; color: black !important; box-shadow: none !important; }
-          .bg-gradient-to-br { background: #fff !important; border: 2px solid #000 !important; color: black !important; border-radius: 8px !important; }
-          .text-white, .text-gray-200, .text-purple-400, .text-gray-400, .text-gray-500 { color: black !important; }
-          .whitespace-pre-wrap { 
-            white-space: pre-wrap !important; 
-            word-wrap: break-word !important;
-            display: block !important;
-            font-family: sans-serif !important;
+          @page { size: portrait; margin: 0.8cm; }
+          
+          html, body { 
+            background: white !important; 
+            color: black !important;
+            font-size: 12pt;
           }
+
+          /* Limpieza de UI innecesaria */
+          header, nav, footer, .print\\:hidden, button, select, .bg-gray-900 { 
+            display: none !important; 
+          }
+
+          #pdf-content {
+            background: white !important;
+            color: black !important;
+            border: none !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
+
           table { width: 100% !important; border-collapse: collapse !important; }
-          th, td { border: 1px solid #ddd !important; padding: 8px !important; }
+          th, td { border: 1px solid #e2e8f0 !important; }
+          
+          * { 
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
+          }
         }
-        .print-block { display: none; }
-      `}</style>
+      `}} />
     </div>
   );
 };
