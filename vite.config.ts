@@ -4,13 +4,13 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  // Capturamos la clave sin importar si se llama API_KEY o GEMINI_API_KEY
   const apiKey = env.GEMINI_API_KEY || env.API_KEY || '';
   
   return {
     plugins: [react()],
     define: {
-      'process.env.API_KEY': JSON.stringify(apiKey),
-      'process.env.GEMINI_API_KEY': JSON.stringify(apiKey)
+      'process.env.API_KEY': JSON.stringify(apiKey)
     },
     resolve: {
       alias: {
