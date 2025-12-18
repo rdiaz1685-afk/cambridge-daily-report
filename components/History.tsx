@@ -7,7 +7,7 @@ import { NeonButton } from './NeonButton';
 import { EmailModal } from './EmailModal';
 import { 
   ArrowLeft, Mail, Star, FileText, Download, 
-  AlertTriangle, Utensils, Moon, ShieldCheck, Heart
+  AlertTriangle, ShieldCheck
 } from 'lucide-react';
 
 interface HistoryProps {
@@ -65,13 +65,9 @@ export const History: React.FC<HistoryProps> = ({ onBack, mode = 'view' }) => {
 
   const handlePrint = () => {
     if (!selectedStudentId) return;
-    
     const originalTitle = document.title;
     document.title = `Cambridge_Reporte_${currentStudent?.name.replace(/\s+/g, '_')}`;
-    
-    // El comando de impresión se ejecuta directamente para evitar bloqueos de Edge
     window.print();
-    
     setTimeout(() => {
       document.title = originalTitle;
     }, 1000);
@@ -152,7 +148,7 @@ export const History: React.FC<HistoryProps> = ({ onBack, mode = 'view' }) => {
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-blue-900 uppercase">Ciclo Escolar</p>
-                <p className="text-lg font-bold">2024 - 2025</p>
+                <p className="text-lg font-bold">2025 - 2026</p>
               </div>
             </div>
 
