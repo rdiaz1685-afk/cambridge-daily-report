@@ -40,7 +40,7 @@ function App() {
       </div>
       
       {currentView !== 'login' && user && (
-        <header className="relative z-10 p-4 border-b border-white/5 bg-[#0a0a12]/80 backdrop-blur-md sticky top-0 flex justify-between items-center">
+        <header className="relative z-10 p-4 border-b border-white/5 bg-[#0a0a12]/80 backdrop-blur-md sticky top-0 flex justify-between items-center print:hidden">
           <div className="flex items-center gap-3">
              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold">C</div>
              <h1 className="text-xs font-bold tracking-widest">CAMBRIDGE <span className="text-cyan-400">COLLEGE</span></h1>
