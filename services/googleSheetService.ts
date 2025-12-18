@@ -1,73 +1,62 @@
 
-/**
- * CONFIGURACIÓN DE CONEXIÓN - CAMBRIDGE DAILY REPORT
- * IMPORTANTE: Asegúrate de que la URL de abajo sea la de tu "Implementación" de Apps Script.
- */
-const SCRIPT_URL: string = 'https://script.google.com/macros/s/AKfycbwCu-KQXJyNazwVSm1_F6QanzxxDrlT7YZbiaNttm7OtZBTo25gqtQ9JxDnNq9u-rda/exec'; 
+import { Campus, DailyReport } from '../types';
 
-/**
- * Obtiene usuarios desde la pestaña 'Users'
- */
+const SCRIPT_URL: string = 'https://script.google.com/macros/s/AKfycbyeige3RYLKIGKvVRo3s-02jnuHDAzQb4H7GAbQ2vWNrEtZD_P9J8f3Xtlk-AzfGWQ/exec'; 
+
 export const fetchUsersFromSheets = async () => {
-  if (!SCRIPT_URL || SCRIPT_URL.includes('TU_URL')) {
-    console.error("SCRIPT_URL no configurada correctamente.");
-    return [];
-  }
+  if (!SCRIPT_URL) return [];
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getUsers`, { 
-      method: 'GET', 
-      redirect: 'follow',
-      headers: { 'Accept': 'application/json' }
-    });
-    if (!response.ok) throw new Error("Error en respuesta de red");
+    const response = await fetch(`${SCRIPT_URL}?action=getUsers`, { method: 'GET', redirect: 'follow' });
     return await response.json();
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    return [];
+  } catch (error) { 
+    return []; 
   }
 };
 
-/**
- * Obtiene alumnos desde la pestaña 'Students'
- */
 export const fetchStudentsFromSheets = async () => {
-  if (!SCRIPT_URL || SCRIPT_URL.includes('TU_URL')) return [];
+  if (!SCRIPT_URL) return [];
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getStudents`, { 
-      method: 'GET', 
-      redirect: 'follow' 
-    });
+    const response = await fetch(`${SCRIPT_URL}?action=getStudents`, { method: 'GET', redirect: 'follow' });
     return await response.json();
   } catch (e) { 
-    console.error("Error fetching students:", e);
     return []; 
   }
 };
 
-/**
- * Obtiene maestros desde la pestaña 'Teachers'
- */
-export const fetchTeachersFromSheets = async () => {
-  if (!SCRIPT_URL || SCRIPT_URL.includes('TU_URL')) return [];
+export const fetchReportsFromSheets = async (): Promise<DailyReport[]> => {
+  if (!SCRIPT_URL) return [];
   try {
-    const response = await fetch(`${SCRIPT_URL}?action=getTeachers`, { 
-      method: 'GET', 
-      redirect: 'follow' 
-    });
-    return await response.json();
+    const response = await fetch(`${SCRIPT_URL}?action=getReports`, { method: 'GET', redirect: 'follow' });
+    const data = await response.json();
+    
+    if (!Array.isArray(data)) return [];
+
+    return data.map((r: any, index: number) => ({
+      id: String(r.id || `cloud-${index}`),
+      date: r.date ? r.date.split('T')[0] : '',
+      timestamp: r.timestamp ? new Date(r.timestamp).getTime() : Date.now(),
+      studentId: String(r.studentId),
+      teacherId: String(r.teacherId),
+      campus: r.campus as Campus,
+      mood: Number(r.mood) || 5,
+      foodIntake: Number(r.foodIntake) || 100,
+      activities: r.activities || '',
+      notes: r.notes || '',
+      medication: r.medication || '',
+      medicationTime: r.medicationTime || '',
+      sleep: r.sleep === 'SÍ' || r.sleep === true,
+      hygiene: (r.hygiene as any) || 'Good',
+      clothingChange: r.clothingChange === 'SÍ' || r.clothingChange === true
+    }));
   } catch (e) { 
-    console.error("Error fetching teachers:", e);
+    console.error("Error fetching reports:", e);
     return []; 
   }
 };
 
-/**
- * Sincroniza el reporte con la pestaña 'Reports' y dispara el correo
- */
-export const syncReportToSheets = async (report: any, studentEmail: string, studentName: string) => {
-  if (!SCRIPT_URL || SCRIPT_URL.includes('TU_URL')) return { success: false };
+export const syncReportToSheets = async (report: DailyReport, studentEmail: string, studentName: string) => {
+  if (!SCRIPT_URL) return { success: false };
   try {
-    // Usamos 'no-cors' para evitar bloqueos del navegador al escribir en Google Script
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -76,17 +65,11 @@ export const syncReportToSheets = async (report: any, studentEmail: string, stud
       body: JSON.stringify({
         action: 'addReport',
         report: report,
-        emailConfig: { 
-          to: studentEmail, 
-          subject: `📝 Reporte Cambridge - ${studentName}`, 
-          studentName 
-        }
+        emailConfig: { to: studentEmail, subject: `📝 Reporte Cambridge - ${studentName}`, studentName }
       }),
     });
-    // Al ser no-cors, no podemos leer la respuesta, pero si no hay error, asumimos éxito
     return { success: true };
   } catch (e) { 
-    console.error("Error syncing report:", e);
     return { success: false }; 
   }
 };
