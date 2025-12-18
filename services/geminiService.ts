@@ -1,13 +1,15 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { DailyReport, Student } from "../types";
 
 export const generateWeeklyInsight = async (student: Student, reports: DailyReport[]): Promise<string> => {
-  if (!process.env.API_KEY) {
-    return "API Key no configurada. No se puede generar el resumen con IA.";
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.error("API Key no detectada en process.env");
+    return "Error: La clave de Inteligencia Artificial no está configurada en el servidor.";
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const reportSummary = reports.map(r => 
     `Fecha: ${r.date}, Ánimo: ${r.mood}/5, Comida: ${r.foodIntake}%, Actividades: ${r.activities}, Notas: ${r.notes}`
@@ -41,12 +43,12 @@ export const generateWeeklyInsight = async (student: Student, reports: DailyRepo
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.0-flash-exp', // Usando un modelo más compatible por si acaso
       contents: prompt,
     });
     return response.text || "No se pudo generar el resumen detallado.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Error al conectar con la IA de Cambridge. Por favor, intenta de nuevo.";
+    return "La IA está ocupada en este momento. Por favor, intenta de nuevo en unos minutos.";
   }
 };
