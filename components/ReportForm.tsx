@@ -5,7 +5,7 @@ import { syncReportToSheets, fetchStudentsFromSheets } from '../services/googleS
 import { NeonButton } from './NeonButton';
 import { 
   Smile, Meh, Frown, ArrowLeft, CheckCircle2, Thermometer, Coffee,
-  Moon, ShieldCheck, Pill, Clock, Sparkles, Shirt
+  Moon, Pill, Clock, Shirt, Sparkles
 } from 'lucide-react';
 
 const MOOD_OPTIONS = [
@@ -33,9 +33,8 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [lastReportData, setLastReportData] = useState<{report: DailyReport, studentName: string} | null>(null);
 
-  // Form State
+  // Form States
   const [mood, setMood] = useState(5);
   const [foodIntake, setFoodIntake] = useState(100);
   const [sleep, setSleep] = useState(true);
@@ -49,7 +48,6 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
     const load = async () => {
       setIsLoading(true);
       const data = await fetchStudentsFromSheets();
-      // Filtramos por el teacherId que viene del login
       setAvailableStudents(data.filter((s: Student) => String(s.teacherId) === String(user.id)));
       setIsLoading(false);
     };
@@ -80,172 +78,153 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
       notes: ''
     };
 
-    const result = await syncReportToSheets(report, student?.parentEmail || '', student?.name || '');
-    if (result.success) {
-      setLastReportData({ report, studentName: student?.name || 'Estudiante' });
-      setIsSuccess(true);
-    } else {
-      alert("Error al sincronizar con Google Sheets. Verifica tu conexión.");
-    }
+    const res = await syncReportToSheets(report, student?.parentEmail || '', student?.name || '');
+    if (res.success) setIsSuccess(true);
+    else alert("Error de sincronización con la nube.");
     setIsSubmitting(false);
   };
 
   if (isSuccess) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] text-center p-8 animate-fadeIn">
-        <div className="relative mb-8">
-           <div className="absolute inset-0 bg-green-500/20 blur-3xl rounded-full animate-pulse" />
-           <CheckCircle2 className="w-24 h-24 text-green-400 relative z-10" />
+      <div className="flex flex-col items-center justify-center min-h-[70vh] animate-fadeIn text-center p-8">
+        <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
+          <CheckCircle2 className="w-16 h-16 text-green-400" />
         </div>
-        <h2 className="text-4xl font-bold text-white mb-2 tracking-tighter">¡REPORTE ENVIADO!</h2>
-        <p className="text-gray-400 mb-8 max-w-sm">Los datos de {lastReportData?.studentName} se han sincronizado con éxito.</p>
-        <NeonButton onClick={onBack} variant="blue" className="px-12">Finalizar</NeonButton>
+        <h2 className="text-3xl font-bold text-white mb-2 uppercase tracking-tighter">¡Reporte Enviado!</h2>
+        <p className="text-gray-400 mb-8">El padre de familia recibirá la notificación en breve.</p>
+        <NeonButton onClick={onBack} variant="blue" className="px-12">Volver al Inicio</NeonButton>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 md:p-8 pb-24">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold text-white uppercase tracking-tighter">Nueva <span className="text-cyan-400">Captura</span></h2>
-        <button onClick={onBack} className="text-gray-500 hover:text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Cancelar
+    <div className="w-full max-w-4xl mx-auto p-4 md:p-8 pb-32">
+      <div className="flex justify-between items-center mb-10">
+        <h2 className="text-2xl font-bold text-white uppercase tracking-tighter">Bitácora <span className="text-cyan-400">Diaria</span></h2>
+        <button onClick={onBack} className="text-gray-500 hover:text-white uppercase text-[10px] font-black flex items-center gap-2">
+          <ArrowLeft className="w-4 h-4" /> Salir
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-neon-card p-6 rounded-2xl border border-gray-800 shadow-xl">
-          <label className="text-[10px] uppercase text-cyan-400 font-black mb-3 block tracking-widest">Seleccionar Alumno</label>
+        <div className="bg-neon-card p-6 rounded-2xl border border-gray-800 shadow-2xl">
+          <label className="text-[10px] uppercase text-cyan-400 font-black mb-3 block tracking-widest">Estudiante</label>
           <select 
-            required 
-            value={selectedStudent} 
+            required value={selectedStudent} 
             onChange={(e) => setSelectedStudent(e.target.value)}
             className="w-full bg-black text-white p-4 rounded-xl border border-gray-700 font-bold text-lg focus:border-cyan-400 outline-none transition-all"
           >
-            <option value="">{isLoading ? 'SINCRONIZANDO...' : 'BUSCAR NOMBRE...'}</option>
+            <option value="">{isLoading ? 'CARGANDO LISTA...' : 'BUSCAR ALUMNO...'}</option>
             {availableStudents.map(s => <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>)}
           </select>
         </div>
 
         {selectedStudent && (
           <div className="space-y-6 animate-fadeIn">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Ánimo */}
-                <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
-                    <label className="text-[10px] uppercase text-cyan-400 font-black mb-4 block tracking-widest">Estado de Ánimo</label>
-                    <div className="flex justify-between gap-2">
-                      {MOOD_OPTIONS.map(m => (
-                        <button key={m.level} type="button" onClick={() => setMood(m.level)} className={`flex-1 p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${mood === m.level ? `${m.border} ${m.bg} scale-105 shadow-lg` : 'border-transparent opacity-20'}`}>
-                          <m.icon className={`w-6 h-6 ${m.color}`} />
-                          <span className="text-[8px] font-black uppercase">{m.label}</span>
-                        </button>
-                      ))}
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Mood */}
+              <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
+                <label className="text-[10px] uppercase text-cyan-400 font-black mb-4 block tracking-widest">Estado de Ánimo</label>
+                <div className="flex justify-between gap-2">
+                  {MOOD_OPTIONS.map(m => (
+                    <button key={m.level} type="button" onClick={() => setMood(m.level)} className={`flex-1 p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${mood === m.level ? `${m.border} ${m.bg} scale-105` : 'border-transparent opacity-30'}`}>
+                      <m.icon className={`w-6 h-6 ${m.color}`} />
+                      <span className="text-[8px] font-black uppercase">{m.label}</span>
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Higiene */}
-                <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
-                    <label className="text-[10px] uppercase text-cyan-400 font-black mb-4 block tracking-widest">Higiene Personal</label>
-                    <div className="flex gap-2">
-                      {HYGIENE_OPTIONS.map(h => (
-                        <button key={h.val} type="button" onClick={() => setHygiene(h.val as any)} className={`flex-1 py-3 rounded-xl border-2 transition-all text-[10px] font-black uppercase ${hygiene === h.val ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400' : 'border-gray-800 text-gray-600'}`}>
-                          {h.label}
-                        </button>
-                      ))}
-                    </div>
+              {/* Hygiene */}
+              <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
+                <label className="text-[10px] uppercase text-cyan-400 font-black mb-4 block tracking-widest">Higiene Personal</label>
+                <div className="flex gap-2">
+                  {HYGIENE_OPTIONS.map(h => (
+                    <button key={h.val} type="button" onClick={() => setHygiene(h.val as any)} className={`flex-1 py-3 rounded-xl border-2 transition-all text-[10px] font-black uppercase ${hygiene === h.val ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400' : 'border-gray-800 text-gray-600'}`}>
+                      {h.label}
+                    </button>
+                  ))}
                 </div>
-             </div>
+              </div>
+            </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Siesta & Ropa */}
-                <div className="bg-neon-card p-6 rounded-2xl border border-gray-800 space-y-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                          <label className="text-[10px] uppercase text-cyan-400 font-black block tracking-widest">Siesta</label>
-                          <p className="text-gray-500 text-[10px] uppercase">¿Logró dormir?</p>
-                        </div>
-                        <button 
-                          type="button" 
-                          onClick={() => setSleep(!sleep)}
-                          className={`w-14 h-7 rounded-full relative transition-all ${sleep ? 'bg-cyan-500 shadow-neon-blue' : 'bg-gray-800'}`}
-                        >
-                          <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${sleep ? 'left-8' : 'left-1'}`} />
-                        </button>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-gray-800 pt-4">
-                        <div>
-                          <label className="text-[10px] uppercase text-fuchsia-400 font-black block tracking-widest">Cambio de Ropa</label>
-                          <p className="text-gray-500 text-[10px] uppercase">¿Se cambió su ropa?</p>
-                        </div>
-                        <button 
-                          type="button" 
-                          onClick={() => setClothingChange(!clothingChange)}
-                          className={`w-14 h-7 rounded-full relative transition-all ${clothingChange ? 'bg-fuchsia-500 shadow-neon-pink' : 'bg-gray-800'}`}
-                        >
-                          <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${clothingChange ? 'left-8' : 'left-1'}`} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Comida */}
-                <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
-                    <label className="text-[10px] uppercase text-cyan-400 font-black mb-2 block tracking-widest">Alimentos Consumidos: {foodIntake}%</label>
-                    <input 
-                      type="range" min="0" max="100" step="25"
-                      value={foodIntake}
-                      onChange={(e) => setFoodIntake(parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 mt-4"
-                    />
-                    <div className="flex justify-between mt-4 text-[8px] text-gray-500 font-black uppercase tracking-widest">
-                      <span>Nada (0%)</span>
-                      <span>Medio (50%)</span>
-                      <span>Todo (100%)</span>
-                    </div>
-                </div>
-             </div>
-
-             {/* Medicina */}
-             <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
-                <div className="flex items-center gap-2 mb-4">
-                  <Pill className="w-4 h-4 text-fuchsia-400" />
-                  <label className="text-[10px] uppercase text-fuchsia-400 font-black tracking-widest">Control Médico (Opcional)</label>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input 
-                    type="text" 
-                    placeholder="Nombre del medicamento..."
-                    value={medication}
-                    onChange={(e) => setMedication(e.target.value)}
-                    className="bg-black border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-fuchsia-500 transition-all"
-                  />
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-                    <input 
-                      type="text" 
-                      placeholder="Hora (ej. 1:30 PM)"
-                      value={medicationTime}
-                      onChange={(e) => setMedicationTime(e.target.value)}
-                      className="w-full bg-black border border-gray-700 rounded-xl p-3 pl-10 text-white text-sm outline-none focus:border-fuchsia-500 transition-all"
-                    />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Routine Checks */}
+              <div className="bg-neon-card p-6 rounded-2xl border border-gray-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Moon className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold uppercase text-white">Siesta Lograda</span>
                   </div>
+                  <button type="button" onClick={() => setSleep(!sleep)} className={`w-12 h-6 rounded-full relative transition-all ${sleep ? 'bg-cyan-500' : 'bg-gray-800'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${sleep ? 'left-7' : 'left-1'}`} />
+                  </button>
                 </div>
-             </div>
+                <div className="flex items-center justify-between border-t border-gray-800 pt-4">
+                  <div className="flex items-center gap-2">
+                    <Shirt className="w-4 h-4 text-fuchsia-400" />
+                    <span className="text-xs font-bold uppercase text-white">Cambio de Ropa</span>
+                  </div>
+                  <button type="button" onClick={() => setClothingChange(!clothingChange)} className={`w-12 h-6 rounded-full relative transition-all ${clothingChange ? 'bg-fuchsia-500' : 'bg-gray-800'}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${clothingChange ? 'left-7' : 'left-1'}`} />
+                  </button>
+                </div>
+              </div>
 
-             {/* Actividades */}
-             <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
-                <label className="text-[10px] uppercase text-cyan-400 font-black mb-3 block tracking-widest">Actividades Pedagógicas</label>
-                <textarea 
-                  required
-                  value={activities}
-                  onChange={(e) => setActivities(e.target.value)}
-                  className="w-full bg-black border border-gray-700 rounded-xl p-4 h-32 text-white outline-none focus:border-cyan-400 text-sm leading-relaxed"
-                  placeholder="Describe los aprendizajes y momentos clave del día..."
+              {/* Food */}
+              <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
+                <label className="text-[10px] uppercase text-cyan-400 font-black mb-4 block tracking-widest">Alimentos: {foodIntake}%</label>
+                <input 
+                  type="range" min="0" max="100" step="25"
+                  value={foodIntake}
+                  onChange={(e) => setFoodIntake(parseInt(e.target.value))}
+                  className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                 />
-             </div>
+                <div className="flex justify-between mt-2 text-[8px] text-gray-500 font-black">
+                  <span>NADA</span>
+                  <span>MEDIO</span>
+                  <span>TODO</span>
+                </div>
+              </div>
+            </div>
 
-             <NeonButton type="submit" fullWidth disabled={isSubmitting} variant="blue" className="py-5 text-lg shadow-2xl">
-                {isSubmitting ? 'SINCRONIZANDO...' : 'PUBLICAR REPORTE OFICIAL'}
-             </NeonButton>
+            {/* Meds */}
+            <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
+              <div className="flex items-center gap-2 mb-4">
+                <Pill className="w-4 h-4 text-fuchsia-400" />
+                <label className="text-[10px] uppercase text-fuchsia-400 font-black tracking-widest">Control de Medicamentos</label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input 
+                  type="text" placeholder="Nombre de la medicina..."
+                  value={medication} onChange={(e) => setMedication(e.target.value)}
+                  className="bg-black border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-fuchsia-500 outline-none"
+                />
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                  <input 
+                    type="text" placeholder="Hora (ej. 12:45 PM)"
+                    value={medicationTime} onChange={(e) => setMedicationTime(e.target.value)}
+                    className="w-full bg-black border border-gray-700 rounded-xl p-3 pl-10 text-white text-sm focus:border-fuchsia-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Activities */}
+            <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
+              <label className="text-[10px] uppercase text-cyan-400 font-black mb-3 block tracking-widest">Logros y Actividades</label>
+              <textarea 
+                required value={activities}
+                onChange={(e) => setActivities(e.target.value)}
+                className="w-full bg-black border border-gray-700 rounded-xl p-4 h-32 text-white text-sm outline-none focus:border-cyan-400"
+                placeholder="Describe el progreso del alumno hoy..."
+              />
+            </div>
+
+            <NeonButton type="submit" fullWidth disabled={isSubmitting} variant="blue" className="py-5 text-lg">
+              {isSubmitting ? 'SINCRONIZANDO...' : 'PUBLICAR REPORTE OFICIAL'}
+            </NeonButton>
           </div>
         )}
       </form>

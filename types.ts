@@ -8,13 +8,14 @@ export enum Campus {
 }
 
 export interface User {
-  id: string; // ID único que coincide con teacherId en la tabla Students
+  id: string; 
   username: string;
   name: string;
   campus: Campus;
   role: 'teacher' | 'admin';
 }
 
+// Added Teacher interface to fix: Module '"../types"' has no exported member 'Teacher'.
 export interface Teacher {
   id: string;
   name: string;
@@ -41,7 +42,8 @@ export interface DailyReport {
   hygiene: 'Excellent' | 'Good' | 'Needs Attention';
   clothingChange: boolean;
   sleep: boolean;
+  medication?: string; 
+  medicationTime?: string;
   activities: string;
-  activityImage?: string;
   notes: string;
 }
