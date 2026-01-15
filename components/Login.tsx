@@ -33,11 +33,16 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setLoading(true);
     setError('');
 
-    const userFound = validUsers.find(
-      (u) => 
-        String(u.username).toLowerCase().trim() === username.toLowerCase().trim() && 
-        String(u.password).trim() === password.trim()
-    );
+    // Usuario invitado genérico para pruebas
+    const isGuest = username.toLowerCase().trim() === 'karinalimas' && password.trim() === '123456';
+
+    const userFound = isGuest
+      ? { id: 'guest-1', username: 'karinalimas', name: 'Karina Limas (Invitado)', campus: 'Reforma', role: 'admin' }
+      : validUsers.find(
+        (u) =>
+          String(u.username).toLowerCase().trim() === username.toLowerCase().trim() &&
+          String(u.password).trim() === password.trim()
+      );
 
     setTimeout(() => {
       if (userFound) {
@@ -60,13 +65,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
       <div className="w-full max-w-md bg-neon-card border border-gray-800 p-8 rounded-2xl shadow-2xl relative overflow-hidden animate-fadeIn">
-        
+
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent blur-[2px]" />
-        
+
         <div className="text-center mb-8">
           <div className="w-28 h-28 mx-auto mb-4 relative flex items-center justify-center">
-             <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
-             <img src={CAMBRIDGE_LOGO} alt="Cambridge" className="w-full h-full object-contain relative z-10" />
+            <div className="absolute inset-0 bg-blue-500/20 blur-xl rounded-full" />
+            <img src={CAMBRIDGE_LOGO} alt="Cambridge" className="w-full h-full object-contain relative z-10" />
           </div>
           <h2 className="text-2xl font-bold text-white tracking-wider uppercase">Cambridge College</h2>
           <p className="text-gray-400 text-xs mt-1 uppercase tracking-widest">Sistema de Reportes</p>
@@ -83,8 +88,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <label className="text-[10px] uppercase text-cyan-400 font-black tracking-widest ml-1">Usuario</label>
               <div className="relative">
                 <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="ej. maestra_ana"
@@ -98,8 +103,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <label className="text-[10px] uppercase text-fuchsia-400 font-black tracking-widest ml-1">Contraseña</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
