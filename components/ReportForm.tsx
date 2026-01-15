@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Student, DailyReport, Campus } from '../types';
 import { syncReportToSheets, fetchStudentsFromSheets } from '../services/googleSheetService';
 import { NeonButton } from './NeonButton';
-import { 
+import {
   Smile, Meh, Frown, ArrowLeft, CheckCircle2, Thermometer, Coffee,
   Moon, Pill, Clock, Shirt, Sparkles
 } from 'lucide-react';
@@ -48,7 +48,14 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
     const load = async () => {
       setIsLoading(true);
       const data = await fetchStudentsFromSheets();
-      setAvailableStudents(data.filter((s: Student) => String(s.teacherId) === String(user.id)));
+      let filtered = data.filter((s: Student) => String(s.teacherId) === String(user.id));
+
+      // Si es un admin o el usuario invitado y no tiene alumnos asignados, mostrar todos
+      if (filtered.length === 0) {
+        filtered = data;
+      }
+
+      setAvailableStudents(filtered);
       setIsLoading(false);
     };
     load();
@@ -58,7 +65,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
     e.preventDefault();
     if (!selectedStudent) return;
     setIsSubmitting(true);
-    
+
     const student = availableStudents.find(s => String(s.id) === String(selectedStudent));
     const report: DailyReport = {
       id: crypto.randomUUID(),
@@ -67,14 +74,14 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
       studentId: selectedStudent,
       teacherId: user.id,
       campus: user.campus as Campus,
-      mood, 
-      foodIntake, 
-      sleep, 
+      mood,
+      foodIntake,
+      sleep,
       hygiene,
       clothingChange,
       medication,
       medicationTime,
-      activities, 
+      activities,
       notes: ''
     };
 
@@ -109,8 +116,8 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-neon-card p-6 rounded-2xl border border-gray-800 shadow-2xl">
           <label className="text-[10px] uppercase text-cyan-400 font-black mb-3 block tracking-widest">Estudiante</label>
-          <select 
-            required value={selectedStudent} 
+          <select
+            required value={selectedStudent}
             onChange={(e) => setSelectedStudent(e.target.value)}
             className="w-full bg-black text-white p-4 rounded-xl border border-gray-700 font-bold text-lg focus:border-cyan-400 outline-none transition-all"
           >
@@ -174,7 +181,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
               {/* Food */}
               <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
                 <label className="text-[10px] uppercase text-cyan-400 font-black mb-4 block tracking-widest">Alimentos: {foodIntake}%</label>
-                <input 
+                <input
                   type="range" min="0" max="100" step="25"
                   value={foodIntake}
                   onChange={(e) => setFoodIntake(parseInt(e.target.value))}
@@ -195,14 +202,14 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
                 <label className="text-[10px] uppercase text-fuchsia-400 font-black tracking-widest">Control de Medicamentos</label>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input 
+                <input
                   type="text" placeholder="Nombre de la medicina..."
                   value={medication} onChange={(e) => setMedication(e.target.value)}
                   className="bg-black border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-fuchsia-500 outline-none"
                 />
                 <div className="relative">
                   <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input 
+                  <input
                     type="text" placeholder="Hora (ej. 12:45 PM)"
                     value={medicationTime} onChange={(e) => setMedicationTime(e.target.value)}
                     className="w-full bg-black border border-gray-700 rounded-xl p-3 pl-10 text-white text-sm focus:border-fuchsia-500 outline-none"
@@ -214,7 +221,7 @@ export const ReportForm: React.FC<ReportFormProps> = ({ user, onBack }) => {
             {/* Activities */}
             <div className="bg-neon-card p-6 rounded-2xl border border-gray-800">
               <label className="text-[10px] uppercase text-cyan-400 font-black mb-3 block tracking-widest">Logros y Actividades</label>
-              <textarea 
+              <textarea
                 required value={activities}
                 onChange={(e) => setActivities(e.target.value)}
                 className="w-full bg-black border border-gray-700 rounded-xl p-4 h-32 text-white text-sm outline-none focus:border-cyan-400"
