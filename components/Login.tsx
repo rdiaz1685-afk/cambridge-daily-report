@@ -33,11 +33,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setLoading(true);
     setError('');
 
-    // Usuario invitado genérico para pruebas
-    const isGuest = username.toLowerCase().trim() === 'karinalimas' && password.trim() === '123456';
+    // Usuario invitado genérico para pruebas - aceptamos con o sin guion bajo
+    const normalizedInput = username.toLowerCase().trim().replace('_', '');
+    const isGuest = (normalizedInput === 'karinalimas') && password.trim() === '123456';
 
     const userFound = isGuest
-      ? { id: 'guest-1', username: 'karinalimas', name: 'Karina Limas (Invitado)', campus: 'Reforma', role: 'admin' }
+      ? { id: 'guest-1', username: 'karina_limas', name: 'Karina Limas (Invitado)', campus: 'Reforma', role: 'admin' }
       : validUsers.find(
         (u) =>
           String(u.username).toLowerCase().trim() === username.toLowerCase().trim() &&
